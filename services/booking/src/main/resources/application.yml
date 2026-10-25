@@ -1,0 +1,12 @@
+server:
+  port: 8082
+spring:
+  application:
+    name: booking
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/booking}
+    username: app
+    password: secret
+  jpa:
+    hibernate:
+      ddl-auto: validate
