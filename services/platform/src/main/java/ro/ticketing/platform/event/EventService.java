@@ -2,6 +2,7 @@ package ro.ticketing.platform.event;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ro.ticketing.platform.venue.VenueService;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -13,19 +14,24 @@ import java.util.UUID;
 class EventService {
 
     private final EventRepository eventRepository;
+    private final VenueService venueService;
     private final Clock clock;
 
-    EventService(EventRepository eventRepository, Clock clock) {
+    EventService(EventRepository eventRepository, VenueService venueService, Clock clock) {
         this.eventRepository = eventRepository;
+        this.venueService = venueService;
         this.clock = clock;
     }
 
     @Transactional
-    Event create(String name, String description, Instant startsAt) {
+    Event create(String name, String description, Instant startsAt, UUID venueId) {
         if (!startsAt.isAfter(clock.instant())) {
             throw new EventStartInPastException(startsAt);
         }
-        return eventRepository.save(new Event(name, description, startsAt));
+        if (venueId != null) {
+            venueService.requireExists(venueId);
+        }
+        return eventRepository.save(new Event(name, description, startsAt, venueId));
     }
 
     Event getById(UUID id) {
@@ -40,6 +46,14 @@ class EventService {
     Event publish(UUID id) {
         Event event = getById(id);
         event.publish();
+        return event;
+    }
+
+    @Transactional
+    Event assignVenue(UUID id, UUID venueId) {
+        Event event = getById(id);
+        venueService.requireExists(venueId);
+        event.assignVenue(venueId);
         return event;
     }
 

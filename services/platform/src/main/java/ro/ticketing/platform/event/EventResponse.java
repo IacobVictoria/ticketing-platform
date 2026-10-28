@@ -9,6 +9,7 @@ record EventResponse(
         String description,
         Instant startsAt,
         EventStatus status,
+        UUID venueId,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -20,6 +21,7 @@ record EventResponse(
                 event.getDescription(),
                 event.getStartsAt(),
                 event.getStatus(),
+                event.getVenueId(),
                 event.getCreatedAt(),
                 event.getUpdatedAt());
     }

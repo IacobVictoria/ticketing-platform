@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,7 +28,8 @@ class EventController {
     @PostMapping
     ResponseEntity<EventResponse> create(@Valid @RequestBody CreateEventRequest request,
             UriComponentsBuilder uriBuilder) {
-        Event event = eventService.create(request.name(), request.description(), request.startsAt());
+        Event event = eventService.create(request.name(), request.description(), request.startsAt(),
+                request.venueId());
         URI location = uriBuilder.path("/api/events/{id}").buildAndExpand(event.getId()).toUri();
         return ResponseEntity.created(location).body(EventResponse.from(event));
     }
@@ -45,6 +47,11 @@ class EventController {
     @PostMapping("/{id}/publish")
     EventResponse publish(@PathVariable UUID id) {
         return EventResponse.from(eventService.publish(id));
+    }
+
+    @PutMapping("/{id}/venue")
+    EventResponse assignVenue(@PathVariable UUID id, @Valid @RequestBody AssignVenueRequest request) {
+        return EventResponse.from(eventService.assignVenue(id, request.venueId()));
     }
 
     @PostMapping("/{id}/cancel")

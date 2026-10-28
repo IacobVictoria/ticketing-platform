@@ -1,6 +1,7 @@
 package ro.ticketing.platform.event;
 
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,6 +28,74 @@ class EventApiTests {
 
     @Autowired
     MockMvcTester mvc;
+
+    String venueId;
+
+    @BeforeEach
+    void createVenue() {
+        MvcTestResult result = mvc.post().uri("/api/venues")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name": "Arena Nationala", "city": "Bucuresti"}
+                        """)
+                .exchange();
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        venueId = idOf(result);
+    }
+
+    @Test
+    void draftWithoutVenueCanGetOneAndBePublished() {
+        String id = idOf(postJson("""
+                {"name": "Concert", "startsAt": "%s"}
+                """.formatted(inDays(30))));
+
+        assertThat(assignVenue(id, venueId))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.venueId").isEqualTo(venueId);
+        assertThat(mvc.post().uri("/api/events/{id}/publish", id))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.status").isEqualTo("PUBLISHED");
+    }
+
+    @Test
+    void assignUnknownVenueReturns404() {
+        String id = idOf(createEvent("Concert", inDays(30)));
+
+        assertThat(assignVenue(id, UUID.randomUUID().toString()))
+                .hasStatus(HttpStatus.NOT_FOUND)
+                .bodyJson().extractingPath("$.code").isEqualTo("VENUE_NOT_FOUND");
+    }
+
+    @Test
+    void venueOfPublishedEventCannotChange() {
+        String id = idOf(createEvent("Concert", inDays(30)));
+        mvc.post().uri("/api/events/{id}/publish", id).exchange();
+
+        assertThat(assignVenue(id, venueId))
+                .hasStatus(HttpStatus.CONFLICT)
+                .bodyJson().extractingPath("$.code").isEqualTo("EVENT_INVALID_STATE");
+    }
+
+    @Test
+    void createWithUnknownVenueReturns404() {
+        MvcTestResult result = postJson("""
+                {"name": "Concert", "startsAt": "%s", "venueId": "%s"}
+                """.formatted(inDays(30), UUID.randomUUID()));
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VENUE_NOT_FOUND");
+    }
+
+    @Test
+    void publishWithoutVenueReturns422() {
+        String id = idOf(postJson("""
+                {"name": "Concert", "startsAt": "%s"}
+                """.formatted(inDays(30))));
+
+        assertThat(mvc.post().uri("/api/events/{id}/publish", id))
+                .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT)
+                .bodyJson().extractingPath("$.code").isEqualTo("EVENT_VENUE_MISSING");
+    }
 
     @Test
     void createReturns201WithLocationAndDraftEvent() {
@@ -120,8 +189,17 @@ class EventApiTests {
 
     private MvcTestResult createEvent(String name, Instant startsAt) {
         return postJson("""
-                {"name": "%s", "startsAt": "%s"}
-                """.formatted(name, startsAt));
+                {"name": "%s", "startsAt": "%s", "venueId": "%s"}
+                """.formatted(name, startsAt, venueId));
+    }
+
+    private MvcTestResult assignVenue(String eventId, String venueId) {
+        return mvc.put().uri("/api/events/{id}/venue", eventId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"venueId": "%s"}
+                        """.formatted(venueId))
+                .exchange();
     }
 
     private MvcTestResult postJson(String json) {

@@ -7,6 +7,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/platform}
     username: app
     password: secret
+    hikari:
+      data-source-properties:
+        # the driver sends a JDBC batch of INSERTs as one multi-row INSERT; without it batch_size barely helps
+        reWriteBatchedInserts: true
   web:
     resources:
       add-mappings: false
@@ -14,3 +18,8 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true

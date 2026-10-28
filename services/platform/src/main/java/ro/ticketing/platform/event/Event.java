@@ -4,23 +4,15 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import ro.ticketing.platform.common.BaseEntity;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "events")
-class Event {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+class Event extends BaseEntity {
 
     @Column(nullable = false, length = 200)
     private String name;
@@ -35,40 +27,43 @@ class Event {
     @Column(nullable = false, length = 20)
     private EventStatus status;
 
-    @CreationTimestamp
-    @Column(nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @UpdateTimestamp
-    @Column(nullable = false)
-    private Instant updatedAt;
+    /** Venues live in another module, so we keep only their id (the DB still has a foreign key). */
+    private UUID venueId;
 
     protected Event() {
     }
 
-    Event(String name, String description, Instant startsAt) {
+    Event(String name, String description, Instant startsAt, UUID venueId) {
         this.name = name;
         this.description = description;
         this.startsAt = startsAt;
+        this.venueId = venueId;
         this.status = EventStatus.DRAFT;
     }
 
     void publish() {
         if (status != EventStatus.DRAFT) {
-            throw new InvalidEventStateException(id, status, "publish");
+            throw new InvalidEventStateException(getId(), status, "publish");
+        }
+        if (venueId == null) {
+            throw new EventVenueMissingException(getId());
         }
         status = EventStatus.PUBLISHED;
     }
 
-    void cancel() {
-        if (status == EventStatus.CANCELLED) {
-            throw new InvalidEventStateException(id, status, "cancel");
+    /** Only a draft can get or change its venue; once published, tickets may already be tied to it. */
+    void assignVenue(UUID venueId) {
+        if (status != EventStatus.DRAFT) {
+            throw new InvalidEventStateException(getId(), status, "change the venue of");
         }
-        status = EventStatus.CANCELLED;
+        this.venueId = venueId;
     }
 
-    UUID getId() {
-        return id;
+    void cancel() {
+        if (status == EventStatus.CANCELLED) {
+            throw new InvalidEventStateException(getId(), status, "cancel");
+        }
+        status = EventStatus.CANCELLED;
     }
 
     String getName() {
@@ -87,11 +82,7 @@ class Event {
         return status;
     }
 
-    Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    Instant getUpdatedAt() {
-        return updatedAt;
+    UUID getVenueId() {
+        return venueId;
     }
 }
