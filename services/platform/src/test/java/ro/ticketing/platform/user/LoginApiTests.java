@@ -55,7 +55,7 @@ class LoginApiTests {
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.tokenType").isEqualTo("Bearer");
-        assertThat(result).bodyJson().extractingPath("$.expiresIn").isEqualTo(3600);
+        assertThat(result).bodyJson().extractingPath("$.expiresIn").isEqualTo(900);
         assertThat(result).bodyJson().extractingPath("$.user.id").isEqualTo(userId);
         assertThat(result).bodyJson().extractingPath("$.user.role").isEqualTo("USER");
 
@@ -63,7 +63,7 @@ class LoginApiTests {
         assertThat(jwt.getSubject()).isEqualTo(userId);
         assertThat(jwt.getClaimAsString("role")).isEqualTo("USER");
         assertThat(jwt.getClaimAsString("iss")).isEqualTo("ticketing-platform");
-        assertThat(Duration.between(jwt.getIssuedAt(), jwt.getExpiresAt())).isEqualTo(Duration.ofHours(1));
+        assertThat(Duration.between(jwt.getIssuedAt(), jwt.getExpiresAt())).isEqualTo(Duration.ofMinutes(15));
         assertThat(jwt.getClaims()).doesNotContainKeys("email", "password", "passwordHash");
     }
 

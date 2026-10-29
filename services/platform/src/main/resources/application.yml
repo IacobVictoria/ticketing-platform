@@ -28,4 +28,11 @@ app:
     issuer: ticketing-platform
     # local default only; any real environment sets JWT_SECRET (at least 32 bytes)
     secret: ${JWT_SECRET:local-dev-secret-change-me-0123456789abcdef}
-    ttl: 1h
+    # short: an access token cannot be revoked, it only expires
+    ttl: 15m
+  refresh-token:
+    ttl: 7d
+    reuse-grace: 30s
+    cookie-secure: true
+    # second minute hour day month weekday: every night at 03:00
+    cleanup-cron: "0 0 3 * * *"

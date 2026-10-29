@@ -1,7 +1,6 @@
 package ro.ticketing.platform.security;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -21,7 +20,6 @@ import java.nio.charset.StandardCharsets;
  * switching to RS256 (private key signs here, public key verifies elsewhere) would avoid sharing it.
  */
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(JwtProperties.class)
 class JwtConfiguration {
 
     @Bean

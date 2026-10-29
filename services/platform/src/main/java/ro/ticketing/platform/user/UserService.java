@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
@@ -58,6 +59,10 @@ class UserService {
             throw new InvalidCredentialsException();
         }
         return user.get();
+    }
+
+    Optional<User> findById(UUID id) {
+        return userRepository.findById(id);
     }
 
     private static boolean exceedsBcryptLimit(String password) {
