@@ -36,3 +36,8 @@ app:
     cookie-secure: true
     # second minute hour day month weekday: every night at 03:00
     cleanup-cron: "0 0 3 * * *"
+  admin:
+    # created at startup only if no admin exists yet; the defaults are for local use only,
+    # any shared environment (Docker demo, production) must set ADMIN_EMAIL and ADMIN_PASSWORD
+    email: ${ADMIN_EMAIL:admin@ticketing.local}
+    password: ${ADMIN_PASSWORD:admin-local-password}

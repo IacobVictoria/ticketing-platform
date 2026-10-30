@@ -31,6 +31,24 @@ class UserService {
      */
     @Transactional
     User register(String email, String password, String firstName, String lastName) {
+        return create(email, password, firstName, lastName, UserRole.USER);
+    }
+
+    /** Only for {@link AdminBootstrap}; there is no API that creates admins. */
+    @Transactional
+    User createAdmin(String email, String password, String firstName, String lastName) {
+        return create(email, password, firstName, lastName, UserRole.ADMIN);
+    }
+
+    boolean adminExists() {
+        return userRepository.existsByRole(UserRole.ADMIN);
+    }
+
+    boolean emailExists(String email) {
+        return userRepository.existsByEmail(User.normalizeEmail(email));
+    }
+
+    private User create(String email, String password, String firstName, String lastName, UserRole role) {
         String normalizedEmail = User.normalizeEmail(email);
         if (userRepository.existsByEmail(normalizedEmail)) {
             throw new EmailAlreadyRegisteredException(normalizedEmail);
@@ -39,7 +57,7 @@ class UserService {
             throw new PasswordTooLongException(BCRYPT_MAX_PASSWORD_BYTES);
         }
         String passwordHash = passwordEncoder.encode(password);
-        return userRepository.save(new User(normalizedEmail, passwordHash, firstName, lastName, UserRole.USER));
+        return userRepository.save(new User(normalizedEmail, passwordHash, firstName, lastName, role));
     }
 
     /**

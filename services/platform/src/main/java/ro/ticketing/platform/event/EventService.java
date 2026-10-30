@@ -38,6 +38,15 @@ class EventService {
         return eventRepository.findById(id).orElseThrow(() -> new EventNotFoundException(id));
     }
 
+    /** Drafts are not public yet: to anyone who may not see them, they do not exist (404, not 403). */
+    Event getVisible(UUID id, boolean canSeeDrafts) {
+        Event event = getById(id);
+        if (event.getStatus() == EventStatus.DRAFT && !canSeeDrafts) {
+            throw new EventNotFoundException(id);
+        }
+        return event;
+    }
+
     List<Event> listPublished() {
         return eventRepository.findByStatusOrderByStartsAtAsc(EventStatus.PUBLISHED);
     }

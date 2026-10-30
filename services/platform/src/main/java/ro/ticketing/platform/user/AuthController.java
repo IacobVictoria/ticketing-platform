@@ -4,7 +4,10 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,6 +15,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import ro.ticketing.platform.security.IssuedToken;
 import ro.ticketing.platform.security.TokenService;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -68,6 +73,16 @@ class AuthController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookies.clear().toString())
                 .build();
+    }
+
+    /**
+     * The current user, from the access token. @AuthenticationPrincipal hands us the already verified JWT;
+     * its "sub" is the user id. The route requires authentication, so the token is never null here.
+     */
+    @GetMapping("/me")
+    UserResponse me(@AuthenticationPrincipal Jwt jwt) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+        return userService.findById(userId).map(UserResponse::from).orElseThrow(AccountNotFoundException::new);
     }
 
     private ResponseEntity<AuthResponse> authenticated(User user, IssuedRefreshToken refreshToken) {

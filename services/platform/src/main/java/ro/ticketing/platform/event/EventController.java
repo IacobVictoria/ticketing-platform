@@ -1,5 +1,6 @@
 package ro.ticketing.platform.event;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,9 +40,11 @@ class EventController {
         return eventService.listPublished().stream().map(EventResponse::from).toList();
     }
 
+    /** Public route; only admins may see DRAFT events. isUserInRole("ADMIN") checks the ROLE_ADMIN authority. */
     @GetMapping("/{id}")
-    EventResponse get(@PathVariable UUID id) {
-        return EventResponse.from(eventService.getById(id));
+    EventResponse get(@PathVariable UUID id, HttpServletRequest request) {
+        boolean isAdmin = request.isUserInRole("ADMIN");
+        return EventResponse.from(eventService.getVisible(id, isAdmin));
     }
 
     @PostMapping("/{id}/publish")

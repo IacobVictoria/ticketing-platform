@@ -10,19 +10,25 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import ro.ticketing.platform.TestcontainersConfiguration;
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class VenueApiTests {
+
+    /** These tests are about events/venues, not security: every request comes from an admin. */
+    static final RequestPostProcessor ADMIN = jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
 
     @Autowired
     MockMvcTester mvc;
@@ -53,7 +59,7 @@ class VenueApiTests {
                 {"rowLabel": "B", "seats": 5}
                 """);
 
-        MvcTestResult venue = mvc.get().uri("/api/venues/{id}", venueId).exchange();
+        MvcTestResult venue = mvc.get().with(ADMIN).uri("/api/venues/{id}", venueId).exchange();
         assertThat(venue).hasStatusOk();
         assertThat(venue).bodyJson().extractingPath("$.totalCapacity").isEqualTo(20015);
         assertThat(venue).bodyJson().extractingPath("$.sectors[?(@.name == 'Tribuna 1')].capacity")
@@ -72,7 +78,7 @@ class VenueApiTests {
                 {"rowLabel": "A", "seats": 2}
                 """);
 
-        assertThat(mvc.get().uri("/api/venues/{v}/sectors/{s}/seats", venueId, sector))
+        assertThat(mvc.get().with(ADMIN).uri("/api/venues/{v}/sectors/{s}/seats", venueId, sector))
                 .hasStatusOk()
                 .bodyJson().extractingPath("$[*].rowLabel").asArray().containsExactly("A", "A", "B", "B");
     }
@@ -86,7 +92,7 @@ class VenueApiTests {
                     """.formatted(row));
         }
 
-        assertThat(mvc.get().uri("/api/venues/{v}/sectors/{s}/seats", venueId, sector))
+        assertThat(mvc.get().with(ADMIN).uri("/api/venues/{v}/sectors/{s}/seats", venueId, sector))
                 .hasStatusOk()
                 .bodyJson().extractingPath("$[*].rowLabel").asArray().containsExactly("1", "2", "10");
     }
@@ -165,14 +171,14 @@ class VenueApiTests {
                 {"name": "Sala Polivalenta", "city": "Bucuresti"}
                 """));
 
-        assertThat(mvc.get().uri("/api/venues/{v}/sectors/{s}", otherVenue, sector))
+        assertThat(mvc.get().with(ADMIN).uri("/api/venues/{v}/sectors/{s}", otherVenue, sector))
                 .hasStatus(HttpStatus.NOT_FOUND)
                 .bodyJson().extractingPath("$.code").isEqualTo("SECTOR_NOT_FOUND");
     }
 
     @Test
     void unknownVenueReturns404() {
-        assertThat(mvc.get().uri("/api/venues/{id}", UUID.randomUUID()))
+        assertThat(mvc.get().with(ADMIN).uri("/api/venues/{id}", UUID.randomUUID()))
                 .hasStatus(HttpStatus.NOT_FOUND)
                 .bodyJson().extractingPath("$.code").isEqualTo("VENUE_NOT_FOUND");
     }
@@ -197,7 +203,7 @@ class VenueApiTests {
     }
 
     private MvcTestResult post(String uri, String json) {
-        return mvc.post().uri(uri).contentType(MediaType.APPLICATION_JSON).content(json).exchange();
+        return mvc.post().with(ADMIN).uri(uri).contentType(MediaType.APPLICATION_JSON).content(json).exchange();
     }
 
     private static String idOf(MvcTestResult result) {

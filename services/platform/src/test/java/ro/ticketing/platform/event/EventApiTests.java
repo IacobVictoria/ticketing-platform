@@ -10,8 +10,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import ro.ticketing.platform.TestcontainersConfiguration;
 
 import java.nio.charset.StandardCharsets;
@@ -20,11 +22,15 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class EventApiTests {
+
+    /** These tests are about events/venues, not security: every request comes from an admin. */
+    static final RequestPostProcessor ADMIN = jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
 
     @Autowired
     MockMvcTester mvc;
@@ -33,7 +39,7 @@ class EventApiTests {
 
     @BeforeEach
     void createVenue() {
-        MvcTestResult result = mvc.post().uri("/api/venues")
+        MvcTestResult result = mvc.post().with(ADMIN).uri("/api/venues")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"name": "Arena Nationala", "city": "Bucuresti"}
@@ -52,7 +58,7 @@ class EventApiTests {
         assertThat(assignVenue(id, venueId))
                 .hasStatusOk()
                 .bodyJson().extractingPath("$.venueId").isEqualTo(venueId);
-        assertThat(mvc.post().uri("/api/events/{id}/publish", id))
+        assertThat(mvc.post().with(ADMIN).uri("/api/events/{id}/publish", id))
                 .hasStatusOk()
                 .bodyJson().extractingPath("$.status").isEqualTo("PUBLISHED");
     }
@@ -69,7 +75,7 @@ class EventApiTests {
     @Test
     void venueOfPublishedEventCannotChange() {
         String id = idOf(createEvent("Concert", inDays(30)));
-        mvc.post().uri("/api/events/{id}/publish", id).exchange();
+        mvc.post().with(ADMIN).uri("/api/events/{id}/publish", id).exchange();
 
         assertThat(assignVenue(id, venueId))
                 .hasStatus(HttpStatus.CONFLICT)
@@ -92,7 +98,7 @@ class EventApiTests {
                 {"name": "Concert", "startsAt": "%s"}
                 """.formatted(inDays(30))));
 
-        assertThat(mvc.post().uri("/api/events/{id}/publish", id))
+        assertThat(mvc.post().with(ADMIN).uri("/api/events/{id}/publish", id))
                 .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT)
                 .bodyJson().extractingPath("$.code").isEqualTo("EVENT_VENUE_MISSING");
     }
@@ -111,10 +117,10 @@ class EventApiTests {
     void publishedEventAppearsInList() {
         String id = idOf(createEvent("Festival", inDays(20)));
 
-        assertThat(mvc.post().uri("/api/events/{id}/publish", id))
+        assertThat(mvc.post().with(ADMIN).uri("/api/events/{id}/publish", id))
                 .hasStatusOk()
                 .bodyJson().extractingPath("$.status").isEqualTo("PUBLISHED");
-        assertThat(mvc.get().uri("/api/events"))
+        assertThat(mvc.get().with(ADMIN).uri("/api/events"))
                 .hasStatusOk()
                 .bodyJson().extractingPath("$[*].id").asArray().contains(id);
     }
@@ -151,7 +157,7 @@ class EventApiTests {
     void unknownEventReturns404WithProblemDetail() {
         UUID id = UUID.randomUUID();
 
-        MvcTestResult result = mvc.get().uri("/api/events/{id}", id).exchange();
+        MvcTestResult result = mvc.get().with(ADMIN).uri("/api/events/{id}", id).exchange();
 
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
         assertThat(result).hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
@@ -163,7 +169,7 @@ class EventApiTests {
 
     @Test
     void invalidUuidReturns400() {
-        assertThat(mvc.get().uri("/api/events/not-a-uuid"))
+        assertThat(mvc.get().with(ADMIN).uri("/api/events/not-a-uuid"))
                 .hasStatus(HttpStatus.BAD_REQUEST)
                 .bodyJson().extractingPath("$.code").isEqualTo("BAD_REQUEST");
     }
@@ -171,9 +177,9 @@ class EventApiTests {
     @Test
     void publishingTwiceReturns409WithCurrentStatus() {
         String id = idOf(createEvent("Concert", inDays(30)));
-        mvc.post().uri("/api/events/{id}/publish", id).exchange();
+        mvc.post().with(ADMIN).uri("/api/events/{id}/publish", id).exchange();
 
-        MvcTestResult result = mvc.post().uri("/api/events/{id}/publish", id).exchange();
+        MvcTestResult result = mvc.post().with(ADMIN).uri("/api/events/{id}/publish", id).exchange();
 
         assertThat(result).hasStatus(HttpStatus.CONFLICT);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("EVENT_INVALID_STATE");
@@ -182,7 +188,7 @@ class EventApiTests {
 
     @Test
     void unknownUrlReturns404ProblemDetail() {
-        assertThat(mvc.get().uri("/api/does-not-exist"))
+        assertThat(mvc.get().with(ADMIN).uri("/api/does-not-exist"))
                 .hasStatus(HttpStatus.NOT_FOUND)
                 .bodyJson().extractingPath("$.code").isEqualTo("NOT_FOUND");
     }
@@ -194,7 +200,7 @@ class EventApiTests {
     }
 
     private MvcTestResult assignVenue(String eventId, String venueId) {
-        return mvc.put().uri("/api/events/{id}/venue", eventId)
+        return mvc.put().with(ADMIN).uri("/api/events/{id}/venue", eventId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"venueId": "%s"}
@@ -203,7 +209,7 @@ class EventApiTests {
     }
 
     private MvcTestResult postJson(String json) {
-        return mvc.post().uri("/api/events")
+        return mvc.post().with(ADMIN).uri("/api/events")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json)
                 .exchange();
