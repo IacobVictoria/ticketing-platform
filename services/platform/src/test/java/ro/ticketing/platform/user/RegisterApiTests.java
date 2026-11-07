@@ -7,6 +7,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
@@ -30,6 +31,9 @@ class RegisterApiTests {
     @Autowired
     PasswordEncoder passwordEncoder;
 
+    @Autowired
+    JdbcClient jdbcClient;
+
     @Test
     void registersUserWithHashedPassword() {
         String email = uniqueEmail();
@@ -39,39 +43,63 @@ class RegisterApiTests {
                  "firstName": " Ana ", "lastName": "Pop"}
                 """.formatted(email.toUpperCase()));
 
-        assertThat(result).hasStatus(HttpStatus.CREATED);
-        assertThat(result).bodyJson().extractingPath("$.email").isEqualTo(email);
-        assertThat(result).bodyJson().extractingPath("$.firstName").isEqualTo("Ana");
-        assertThat(result).bodyJson().extractingPath("$.role").isEqualTo("USER");
-        assertThat(result).bodyJson().hasPath("$.id");
-        assertThat(result).bodyJson().doesNotHavePath("$.password");
-        assertThat(result).bodyJson().doesNotHavePath("$.passwordHash");
+        assertThat(result).hasStatus(HttpStatus.ACCEPTED);
+        assertThat(result).bodyText().isEmpty();
 
         User saved = userRepository.findByEmail(email).orElseThrow();
+        assertThat(saved.getFirstName()).isEqualTo("Ana");
+        assertThat(saved.getRole()).isEqualTo(UserRole.USER);
+        assertThat(saved.isEmailVerified()).isFalse();
         assertThat(saved.getPasswordHash()).startsWith("{bcrypt}").doesNotContain("parola-sigura");
         assertThat(passwordEncoder.matches("parola-sigura", saved.getPasswordHash())).isTrue();
     }
 
     @Test
     void roleFromRequestIsIgnored() {
+        String email = uniqueEmail();
+
         MvcTestResult result = register("""
                 {"email": "%s", "password": "parola-sigura", "confirmPassword": "parola-sigura",
                  "firstName": "Ana", "lastName": "Pop", "role": "ADMIN"}
-                """.formatted(uniqueEmail()));
+                """.formatted(email));
 
-        assertThat(result).hasStatus(HttpStatus.CREATED);
-        assertThat(result).bodyJson().extractingPath("$.role").isEqualTo("USER");
+        assertThat(result).hasStatus(HttpStatus.ACCEPTED);
+        assertThat(userRepository.findByEmail(email).orElseThrow().getRole()).isEqualTo(UserRole.USER);
     }
 
     @Test
-    void emailAlreadyRegisteredIgnoringCaseIsRejected() {
+    void registeringAVerifiedEmailLooksTheSameButChangesNothing() {
         String email = uniqueEmail();
-        assertThat(register(validBody(email))).hasStatus(HttpStatus.CREATED);
+        assertThat(register(validBody(email))).hasStatus(HttpStatus.ACCEPTED);
+        AuthApi.markEmailVerified(jdbcClient, email);
 
-        MvcTestResult result = register(validBody(email.toUpperCase()));
+        MvcTestResult result = register("""
+                {"email": "%s", "password": "parola-atacatorului", "confirmPassword": "parola-atacatorului",
+                 "firstName": "Mallory", "lastName": "X"}
+                """.formatted(email.toUpperCase()));
 
-        assertThat(result).hasStatus(HttpStatus.CONFLICT);
-        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("EMAIL_ALREADY_REGISTERED");
+        assertThat(result).hasStatus(HttpStatus.ACCEPTED);
+        assertThat(result).bodyText().isEmpty();
+        User saved = userRepository.findByEmail(email).orElseThrow();
+        assertThat(saved.getFirstName()).isEqualTo("Ana");
+        assertThat(passwordEncoder.matches("parola-sigura", saved.getPasswordHash())).isTrue();
+    }
+
+    @Test
+    void registeringAnUnverifiedEmailAgainReplacesTheOldDetails() {
+        String email = uniqueEmail();
+        assertThat(register(validBody(email))).hasStatus(HttpStatus.ACCEPTED);
+
+        MvcTestResult result = register("""
+                {"email": "%s", "password": "alta-parola-sigura", "confirmPassword": "alta-parola-sigura",
+                 "firstName": "Maria", "lastName": "Ionescu"}
+                """.formatted(email));
+
+        assertThat(result).hasStatus(HttpStatus.ACCEPTED);
+        User saved = userRepository.findByEmail(email).orElseThrow();
+        assertThat(saved.getFirstName()).isEqualTo("Maria");
+        assertThat(passwordEncoder.matches("alta-parola-sigura", saved.getPasswordHash())).isTrue();
+        assertThat(passwordEncoder.matches("parola-sigura", saved.getPasswordHash())).isFalse();
     }
 
     @Test

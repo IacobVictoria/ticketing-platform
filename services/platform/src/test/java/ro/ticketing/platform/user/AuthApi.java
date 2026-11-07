@@ -4,6 +4,7 @@ import jakarta.servlet.http.Cookie;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
@@ -17,19 +18,29 @@ class AuthApi {
     static final String PASSWORD = "parola-sigura";
 
     private final MockMvcTester mvc;
+    private final JdbcClient jdbcClient;
 
-    AuthApi(MockMvcTester mvc) {
+    AuthApi(MockMvcTester mvc, JdbcClient jdbcClient) {
         this.mvc = mvc;
+        this.jdbcClient = jdbcClient;
     }
 
-    /** Registers a new user with a unique email and returns the email. */
+    /** Registers a new user with a unique email, confirms the email directly in the database and returns it. */
     String registerNewUser() {
         String email = "ana." + UUID.randomUUID() + "@example.ro";
         MvcTestResult result = post("/api/auth/register", """
                 {"email": "%s", "password": "%s", "confirmPassword": "%s", "firstName": "Ana", "lastName": "Pop"}
                 """.formatted(email, PASSWORD, PASSWORD));
-        assertThat(result).hasStatus(HttpStatus.CREATED);
+        assertThat(result).hasStatus(HttpStatus.ACCEPTED);
+        markEmailVerified(jdbcClient, email);
         return email;
+    }
+
+    /** Shortcut for tests that are not about email verification: as if the user clicked the link. */
+    static void markEmailVerified(JdbcClient jdbcClient, String email) {
+        jdbcClient.sql("update users set email_verified_at = now() where email = :email")
+                .param("email", User.normalizeEmail(email))
+                .update();
     }
 
     MvcTestResult login(String email, String password) {

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,28 +17,59 @@ class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailVerificationService emailVerificationService;
+    private final Clock clock;
     /** Checked against when the email is unknown, so that case takes as long as a wrong password. */
     private final String dummyPasswordHash;
 
-    UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    UserService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+            EmailVerificationService emailVerificationService, Clock clock) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.emailVerificationService = emailVerificationService;
+        this.clock = clock;
         this.dummyPasswordHash = passwordEncoder.encode("dummy-password-for-unknown-emails");
     }
 
     /**
-     * Two concurrent registrations with the same email can both pass the exists check;
-     * the UNIQUE constraint rejects the second one (409 DATA_CONFLICT).
+     * Looks the same from outside for every email (the caller always answers 202 with no body), so nobody can use
+     * it to find out who has an account. What happens differs, and the email tells the owner of the address:
+     * - new email: a new account and a verification email (the user and the token are saved together);
+     * - unverified email: it is not really taken yet, so the old details are replaced and a new link is sent;
+     *   that way nobody can block an address by registering it first;
+     * - verified email: nothing changes, the owner gets a "you already have an account" email.
+     * The password is hashed in every case, so the response takes about as long whatever the email.
+     * Two concurrent registrations with a new email can both find no row; the UNIQUE constraint rejects
+     * the second one (409 DATA_CONFLICT), which only tells it that someone registered at the same moment.
      */
     @Transactional
-    User register(String email, String password, String firstName, String lastName) {
-        return create(email, password, firstName, lastName, UserRole.USER);
+    void register(String email, String password, String firstName, String lastName) {
+        if (exceedsBcryptLimit(password)) {
+            throw new PasswordTooLongException(BCRYPT_MAX_PASSWORD_BYTES);
+        }
+        String normalizedEmail = User.normalizeEmail(email);
+        String passwordHash = passwordEncoder.encode(password);
+
+        Optional<User> existing = userRepository.findForUpdateByEmail(normalizedEmail);
+        if (existing.isEmpty()) {
+            User user = userRepository.save(new User(normalizedEmail, passwordHash, firstName, lastName, UserRole.USER));
+            // the token row references the user, so the user's row must be in the database first
+            userRepository.flush();
+            emailVerificationService.sendVerificationEmail(user);
+        } else if (existing.get().isEmailVerified()) {
+            emailVerificationService.sendExistingAccountEmail(existing.get());
+        } else {
+            existing.get().replaceRegistration(passwordHash, firstName, lastName);
+            emailVerificationService.sendVerificationEmail(existing.get());
+        }
     }
 
-    /** Only for {@link AdminBootstrap}; there is no API that creates admins. */
+    /** Only for {@link AdminBootstrap}; there is no API that creates admins. The admin needs no email confirmation. */
     @Transactional
     User createAdmin(String email, String password, String firstName, String lastName) {
-        return create(email, password, firstName, lastName, UserRole.ADMIN);
+        User admin = create(email, password, firstName, lastName, UserRole.ADMIN);
+        admin.markEmailVerified(clock.instant());
+        return admin;
     }
 
     boolean adminExists() {
@@ -76,6 +108,10 @@ class UserService {
         if (user.isEmpty() || !passwordMatches) {
             throw new InvalidCredentialsException();
         }
+        // checked only after the password, so it reveals nothing to someone who does not know it
+        if (!user.get().isEmailVerified()) {
+            throw new EmailNotVerifiedException();
+        }
         return user.get();
     }
 
@@ -83,7 +119,7 @@ class UserService {
         return userRepository.findById(id);
     }
 
-    private static boolean exceedsBcryptLimit(String password) {
+    static boolean exceedsBcryptLimit(String password) {
         return password.getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_PASSWORD_BYTES;
     }
 }

@@ -30,7 +30,7 @@ class RefreshTokenApiTests {
 
     @BeforeEach
     void registerUser() {
-        api = new AuthApi(mvc);
+        api = new AuthApi(mvc, jdbcClient);
         email = api.registerNewUser();
     }
 
@@ -50,7 +50,7 @@ class RefreshTokenApiTests {
         String refreshToken = api.loginAndGetRefreshToken(email);
 
         String storedHash = jdbcClient.sql("select token_hash from refresh_tokens where token_hash = :hash")
-                .param("hash", RefreshTokenService.hash(refreshToken))
+                .param("hash", RandomTokens.hash(refreshToken))
                 .query(String.class)
                 .single();
         assertThat(storedHash).isNotEqualTo(refreshToken).hasSize(64);
@@ -101,7 +101,7 @@ class RefreshTokenApiTests {
     void expiredTokenIsRejected() {
         String refreshToken = api.loginAndGetRefreshToken(email);
         jdbcClient.sql("update refresh_tokens set expires_at = now() - interval '1 second' where token_hash = :hash")
-                .param("hash", RefreshTokenService.hash(refreshToken))
+                .param("hash", RandomTokens.hash(refreshToken))
                 .update();
 
         assertThat(api.refresh(refreshToken)).hasStatus(HttpStatus.UNAUTHORIZED);
@@ -140,7 +140,7 @@ class RefreshTokenApiTests {
 
     private String familyOf(String refreshToken) {
         return jdbcClient.sql("select family_id::text from refresh_tokens where token_hash = :hash")
-                .param("hash", RefreshTokenService.hash(refreshToken))
+                .param("hash", RandomTokens.hash(refreshToken))
                 .query(String.class)
                 .single();
     }

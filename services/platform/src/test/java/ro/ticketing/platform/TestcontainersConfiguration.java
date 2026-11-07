@@ -1,18 +1,19 @@
 package ro.ticketing.platform;
 
+import org.mockito.Mockito;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
-import org.testcontainers.postgresql.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
+import org.springframework.context.annotation.Import;
+import org.springframework.mail.javamail.JavaMailSender;
 
+/** What every test needs: the database, and a fake mail sender so that tests never send real emails. */
 @TestConfiguration(proxyBeanMethods = false)
+@Import(PostgresContainerConfiguration.class)
 public class TestcontainersConfiguration {
 
     @Bean
-    @ServiceConnection
-    PostgreSQLContainer postgresContainer() {
-        return new PostgreSQLContainer(DockerImageName.parse("postgres:18"));
+    JavaMailSender mailSender() {
+        return Mockito.mock(JavaMailSender.class);
     }
 
 }

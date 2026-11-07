@@ -27,14 +27,14 @@ class RefreshTokenCleanupTests {
 
     @Test
     void deletesExpiredTokensButKeepsRevokedOnesUntilTheyExpire() {
-        AuthApi api = new AuthApi(mvc);
+        AuthApi api = new AuthApi(mvc, jdbcClient);
         String email = api.registerNewUser();
         String expired = api.loginAndGetRefreshToken(email);
         String active = api.loginAndGetRefreshToken(email);
         String loggedOut = api.loginAndGetRefreshToken(email);
         api.logout(loggedOut);
         jdbcClient.sql("update refresh_tokens set expires_at = now() - interval '1 second' where token_hash = :hash")
-                .param("hash", RefreshTokenService.hash(expired))
+                .param("hash", RandomTokens.hash(expired))
                 .update();
 
         refreshTokenService.deleteExpired();
@@ -47,7 +47,7 @@ class RefreshTokenCleanupTests {
 
     private boolean exists(String refreshToken) {
         return jdbcClient.sql("select count(*) from refresh_tokens where token_hash = :hash")
-                .param("hash", RefreshTokenService.hash(refreshToken))
+                .param("hash", RandomTokens.hash(refreshToken))
                 .query(Long.class)
                 .single() == 1;
     }

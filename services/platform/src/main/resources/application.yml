@@ -3,6 +3,15 @@ server:
 spring:
   application:
     name: platform
+  # locally: Mailpit from infra/compose.yaml (inbox at http://localhost:8025)
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    # in milliseconds; without them a mail server that stops answering would block forever
+    properties:
+      "mail.smtp.connectiontimeout": 5000
+      "mail.smtp.timeout": 5000
+      "mail.smtp.writetimeout": 5000
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/platform}
     username: app
@@ -23,7 +32,16 @@ spring:
         jdbc:
           batch_size: 50
         order_inserts: true
+management:
+  health:
+    mail:
+      # the app works without the mail server (users can ask for the email again),
+      # so a stopped Mailpit must not turn /actuator/health DOWN
+      enabled: false
 app:
+  # used to build links in emails (the verification page lives in the Angular app)
+  frontend-url: ${FRONTEND_URL:http://localhost:4200}
+  mail-from: "Ticketing <no-reply@ticketing.local>"
   jwt:
     issuer: ticketing-platform
     # local default only; any real environment sets JWT_SECRET (at least 32 bytes)

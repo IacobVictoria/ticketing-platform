@@ -6,14 +6,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.UUID;
 
 /**
@@ -30,10 +24,6 @@ class RefreshTokenService {
 
     private static final Logger log = LoggerFactory.getLogger(RefreshTokenService.class);
 
-    /** 256 bits of randomness: guessing a valid token is not feasible. */
-    private static final int TOKEN_BYTES = 32;
-
-    private final SecureRandom secureRandom = new SecureRandom();
     private final RefreshTokenRepository refreshTokenRepository;
     private final RefreshTokenProperties properties;
     private final Clock clock;
@@ -57,7 +47,7 @@ class RefreshTokenService {
     @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     Rotation rotate(String rawToken) {
         Instant now = clock.instant();
-        RefreshToken token = refreshTokenRepository.findForUpdateByTokenHash(hash(rawToken))
+        RefreshToken token = refreshTokenRepository.findForUpdateByTokenHash(RandomTokens.hash(rawToken))
                 .orElseThrow(InvalidRefreshTokenException::new);
 
         if (token.isRevoked()) {
@@ -81,7 +71,7 @@ class RefreshTokenService {
 
     /** Logout. Unknown or already revoked tokens are ignored: logging out twice is not an error. */
     void revoke(String rawToken) {
-        refreshTokenRepository.findForUpdateByTokenHash(hash(rawToken))
+        refreshTokenRepository.findForUpdateByTokenHash(RandomTokens.hash(rawToken))
                 .ifPresent(token -> token.revoke(RevokeReason.LOGOUT, clock.instant()));
     }
 
@@ -97,26 +87,11 @@ class RefreshTokenService {
     }
 
     private IssuedRefreshToken issue(UUID userId, UUID familyId) {
-        byte[] bytes = new byte[TOKEN_BYTES];
-        secureRandom.nextBytes(bytes);
-        String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String rawToken = RandomTokens.generate();
 
         Instant expiresAt = clock.instant().plus(properties.ttl());
-        refreshTokenRepository.save(new RefreshToken(userId, familyId, hash(rawToken), expiresAt));
+        refreshTokenRepository.save(new RefreshToken(userId, familyId, RandomTokens.hash(rawToken), expiresAt));
         return new IssuedRefreshToken(rawToken, properties.ttl());
-    }
-
-    /**
-     * SHA-256, not BCrypt: the token is 256 random bits, so there is nothing to brute-force and no need
-     * for a slow hash; and a deterministic hash lets us find the row by it (BCrypt's random salt would not).
-     */
-    static String hash(String rawToken) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(rawToken.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is required on every JVM", e);
-        }
     }
 
     record Rotation(UUID userId, IssuedRefreshToken refreshToken) {

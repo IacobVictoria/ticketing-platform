@@ -31,7 +31,8 @@ class SecurityConfiguration {
                         // anyone
                         .requestMatchers("/error", "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login",
-                                "/api/auth/refresh", "/api/auth/logout").permitAll()
+                                "/api/auth/refresh", "/api/auth/logout", "/api/auth/verify-email",
+                                "/api/auth/resend-verification").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/events", "/api/events/*", "/api/venues/**").permitAll()
                         // only admins create and change events and venues
                         .requestMatchers("/api/events/**", "/api/venues/**").hasRole("ADMIN")

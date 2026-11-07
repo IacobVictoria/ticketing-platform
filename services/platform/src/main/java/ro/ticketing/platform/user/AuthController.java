@@ -26,21 +26,39 @@ class AuthController {
     private final TokenService tokenService;
     private final RefreshTokenService refreshTokenService;
     private final RefreshTokenCookies refreshTokenCookies;
+    private final EmailVerificationService emailVerificationService;
 
     AuthController(UserService userService, TokenService tokenService, RefreshTokenService refreshTokenService,
-            RefreshTokenCookies refreshTokenCookies) {
+            RefreshTokenCookies refreshTokenCookies, EmailVerificationService emailVerificationService) {
         this.userService = userService;
         this.tokenService = tokenService;
         this.refreshTokenService = refreshTokenService;
         this.refreshTokenCookies = refreshTokenCookies;
+        this.emailVerificationService = emailVerificationService;
     }
 
+    /**
+     * Always 202 with no body, whether the email is new, unverified or already has an account: the answer
+     * cannot be used to find out who has an account. The email the user receives says what happened.
+     */
     @PostMapping("/register")
-    @ResponseStatus(HttpStatus.CREATED)
-    UserResponse register(@Valid @RequestBody RegisterRequest request) {
-        User user = userService.register(request.email(), request.password(), request.firstName(),
-                request.lastName());
-        return UserResponse.from(user);
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    void register(@Valid @RequestBody RegisterRequest request) {
+        userService.register(request.email(), request.password(), request.firstName(), request.lastName());
+    }
+
+    /** Called by the frontend page the email link opens. 204 = the account is active, the user can log in. */
+    @PostMapping("/verify-email")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        emailVerificationService.verify(request.token(), request.password());
+    }
+
+    /** Always 202, whether the email exists or not, so this cannot be used to find out who has an account. */
+    @PostMapping("/resend-verification")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    void resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        emailVerificationService.resend(request.email());
     }
 
     @PostMapping("/login")

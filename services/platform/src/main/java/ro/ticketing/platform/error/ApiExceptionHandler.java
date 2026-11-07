@@ -53,6 +53,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return domainProblem(HttpStatus.UNAUTHORIZED, ex, request);
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    ProblemDetail handleForbidden(ForbiddenException ex, HttpServletRequest request) {
+        return domainProblem(HttpStatus.FORBIDDEN, ex, request);
+    }
+
     @ExceptionHandler(ConflictException.class)
     ProblemDetail handleConflict(ConflictException ex, HttpServletRequest request) {
         return domainProblem(HttpStatus.CONFLICT, ex, request);

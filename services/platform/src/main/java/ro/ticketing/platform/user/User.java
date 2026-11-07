@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import ro.ticketing.platform.common.BaseEntity;
 
+import java.time.Instant;
 import java.util.Locale;
 
 @Entity
@@ -30,6 +31,12 @@ class User extends BaseEntity {
     @Column(nullable = false, length = 20)
     private UserRole role;
 
+    /** Null until the user clicks the link in the verification email. */
+    private Instant emailVerifiedAt;
+
+    /** Last "someone tried to register with your email" message; null if never sent. */
+    private Instant existingAccountEmailSentAt;
+
     protected User() {
     }
 
@@ -44,6 +51,31 @@ class User extends BaseEntity {
     /** Emails are stored trimmed and lower-case, so "Ana@X.ro " and "ana@x.ro" are the same account. */
     static String normalizeEmail(String email) {
         return email.strip().toLowerCase(Locale.ROOT);
+    }
+
+    boolean isEmailVerified() {
+        return emailVerifiedAt != null;
+    }
+
+    void markEmailVerified(Instant now) {
+        if (emailVerifiedAt == null) {
+            emailVerifiedAt = now;
+        }
+    }
+
+    /** Registering again with an unverified email: the newest registration wins. */
+    void replaceRegistration(String passwordHash, String firstName, String lastName) {
+        this.passwordHash = passwordHash;
+        this.firstName = firstName.strip();
+        this.lastName = lastName.strip();
+    }
+
+    boolean existingAccountEmailSentAfter(Instant time) {
+        return existingAccountEmailSentAt != null && existingAccountEmailSentAt.isAfter(time);
+    }
+
+    void markExistingAccountEmailSent(Instant now) {
+        existingAccountEmailSentAt = now;
     }
 
     String getEmail() {

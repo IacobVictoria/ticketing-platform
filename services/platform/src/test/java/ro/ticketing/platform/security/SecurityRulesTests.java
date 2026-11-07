@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -44,6 +45,9 @@ class SecurityRulesTests {
     @Autowired
     JwtEncoder jwtEncoder;
 
+    @Autowired
+    JdbcClient jdbcClient;
+
     String adminToken;
     String userToken;
     String userEmail;
@@ -56,7 +60,11 @@ class SecurityRulesTests {
         assertThat(postJson("/api/auth/register", null, """
                 {"email": "%s", "password": "parola-sigura", "confirmPassword": "parola-sigura",
                  "firstName": "Ana", "lastName": "Pop"}
-                """.formatted(userEmail))).hasStatus(HttpStatus.CREATED);
+                """.formatted(userEmail))).hasStatus(HttpStatus.ACCEPTED);
+        // as if the user clicked the link in the verification email
+        jdbcClient.sql("update users set email_verified_at = now() where email = :email")
+                .param("email", userEmail)
+                .update();
         userToken = accessToken(userEmail, "parola-sigura");
     }
 

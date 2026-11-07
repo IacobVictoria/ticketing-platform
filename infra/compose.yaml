@@ -14,5 +14,14 @@ services:
       - pgdata:/var/lib/postgresql
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  # fake mail server for development: catches every email, nothing reaches the internet
+  # inbox in the browser: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: ticketing-mailpit
+    ports:
+      - "1025:1025" # SMTP: the services send emails here
+      - "8025:8025" # web UI
+
 volumes:
   pgdata:

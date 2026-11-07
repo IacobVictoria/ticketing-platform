@@ -9,6 +9,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -35,6 +36,9 @@ class LoginApiTests {
     @Autowired
     JwtDecoder jwtDecoder;
 
+    @Autowired
+    JdbcClient jdbcClient;
+
     String email;
     String userId;
 
@@ -45,8 +49,12 @@ class LoginApiTests {
                 {"email": "%s", "password": "parola-sigura", "confirmPassword": "parola-sigura",
                  "firstName": "Ana", "lastName": "Pop"}
                 """.formatted(email));
-        assertThat(result).hasStatus(HttpStatus.CREATED);
-        userId = JsonPath.read(bodyOf(result), "$.id");
+        assertThat(result).hasStatus(HttpStatus.ACCEPTED);
+        AuthApi.markEmailVerified(jdbcClient, email);
+        userId = jdbcClient.sql("select id::text from users where email = :email")
+                .param("email", email)
+                .query(String.class)
+                .single();
     }
 
     @Test

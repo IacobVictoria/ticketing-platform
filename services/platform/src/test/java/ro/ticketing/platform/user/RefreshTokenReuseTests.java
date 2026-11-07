@@ -26,7 +26,7 @@ class RefreshTokenReuseTests {
 
     @Test
     void reusingARotatedTokenRevokesTheWholeFamily() {
-        AuthApi api = new AuthApi(mvc);
+        AuthApi api = new AuthApi(mvc, jdbcClient);
         String email = api.registerNewUser();
         String stolen = api.loginAndGetRefreshToken(email);
 
@@ -38,7 +38,7 @@ class RefreshTokenReuseTests {
         // neither of them can continue: both must log in again
         assertThat(api.refresh(legit)).hasStatus(HttpStatus.UNAUTHORIZED);
         assertThat(jdbcClient.sql("select revoke_reason from refresh_tokens where token_hash = :hash")
-                .param("hash", RefreshTokenService.hash(legit))
+                .param("hash", RandomTokens.hash(legit))
                 .query(String.class)
                 .single()).isEqualTo("REUSE_DETECTED");
     }
