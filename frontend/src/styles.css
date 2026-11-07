@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+
+/*
+ * The form controls repeat on every auth page, so they get a short name here instead of the same
+ * ten utility classes in each template. Everything else is written with utilities directly in the templates.
+ */
+@layer components {
+  .form-label {
+    @apply mt-3 mb-1 block font-semibold;
+  }
+
+  .form-input {
+    @apply w-full rounded border border-gray-500 px-2 py-2;
+  }
+
+  .btn-primary {
+    @apply mt-4 cursor-pointer rounded border border-blue-700 bg-blue-700 px-4 py-2 text-white hover:bg-blue-800 disabled:cursor-default disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply mt-4 cursor-pointer rounded border border-blue-700 bg-white px-4 py-2 text-blue-700 hover:bg-blue-50 disabled:cursor-default disabled:opacity-60;
+  }
+
+  .link {
+    @apply text-blue-700 underline hover:text-blue-800;
+  }
+
+  .error-text {
+    @apply mt-3 text-red-700;
+  }
+}
+
+@layer base {
+  /* Tailwind removes all default margins; paragraphs still need some space between them */
+  p {
+    @apply mt-3;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-blue-700;
+  }
+}
