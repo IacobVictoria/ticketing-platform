@@ -4,8 +4,13 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    title: 'Ticketing',
-    loadComponent: () => import('./home').then((m) => m.Home),
+    title: 'Evenimente',
+    loadComponent: () => import('./events/event-list').then((m) => m.EventList),
+  },
+  {
+    path: 'events/:id',
+    title: 'Eveniment',
+    loadComponent: () => import('./events/event-details').then((m) => m.EventDetails),
   },
   {
     path: 'login',

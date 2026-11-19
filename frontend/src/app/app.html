@@ -1,6 +1,15 @@
-<header class="border-b border-gray-300 p-4">
+<header class="flex items-center justify-between gap-4 border-b border-gray-300 p-4">
   <a routerLink="/" class="font-bold text-blue-700">Ticketing</a>
+  <nav aria-label="Cont" class="flex items-center gap-4">
+    @if (auth.user(); as user) {
+      <span>{{ user.firstName }}</span>
+      <button type="button" class="link cursor-pointer" (click)="logout()">Ieși din cont</button>
+    } @else {
+      <a routerLink="/login" class="link">Intră în cont</a>
+      <a routerLink="/register" class="link">Creează cont</a>
+    }
+  </nav>
 </header>
-<main class="mx-auto max-w-md p-4 text-gray-800">
+<main class="mx-auto max-w-2xl p-4 text-gray-800">
   <router-outlet />
 </main>

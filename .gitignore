@@ -18,3 +18,12 @@ dist/
 # Secrete și loguri
 .env
 *.log
+
+# Claude Code (local, nu se urcă pe GitHub)
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.mcp.json
+
+# Documentație de învățare (locală)
+docs/
